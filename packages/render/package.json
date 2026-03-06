@@ -1,0 +1,25 @@
+{
+  "name": "@dooh/render",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "lint": "eslint src/"
+  },
+  "dependencies": {
+    "@dooh/core": "*",
+    "three": "^0.164.0",
+    "@react-three/fiber": "^8.16.0",
+    "@react-three/drei": "^9.105.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.164.0",
+    "typescript": "^5.4.0"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0"
+  }
+}

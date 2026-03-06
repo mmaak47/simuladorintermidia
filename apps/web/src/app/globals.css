@@ -1,0 +1,57 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --surface-0: #0a0a0b;
+  --surface-1: #111113;
+  --surface-2: #1a1a1e;
+  --surface-3: #242429;
+  --accent: #6366f1;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--surface-0);
+  color: #e4e4e7;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Canvas overlay for corner editing */
+.corner-handle {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #6366f1;
+  background: rgba(99, 102, 241, 0.3);
+  border-radius: 50%;
+  position: absolute;
+  transform: translate(-50%, -50%);
+  cursor: grab;
+  z-index: 20;
+  transition: background 0.15s;
+}
+
+.corner-handle:hover,
+.corner-handle:active {
+  background: rgba(99, 102, 241, 0.7);
+  cursor: grabbing;
+}
+
+/* Zoom lens */
+.zoom-lens {
+  position: fixed;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  border: 2px solid rgba(99, 102, 241, 0.6);
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 100;
+  image-rendering: pixelated;
+}

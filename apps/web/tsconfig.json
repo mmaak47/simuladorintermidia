@@ -1,0 +1,40 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ],
+      "@dooh/core": [
+        "../../packages/core/src"
+      ],
+      "@dooh/core/*": [
+        "../../packages/core/src/*"
+      ],
+      "@dooh/render": [
+        "../../packages/render/src"
+      ],
+      "@dooh/render/*": [
+        "../../packages/render/src/*"
+      ]
+    },
+    "allowJs": true,
+    "incremental": true,
+    "jsx": "preserve"
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "name": "dooh-simulator",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "web": "npm run dev --workspace=apps/web",
+    "vision": "cd apps/vision && python -m uvicorn main:app --reload --port 8000"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0",
+    "typescript": "^5.4.0"
+  }
+}
