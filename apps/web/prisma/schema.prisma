@@ -1,0 +1,118 @@
+// DOOH Simulator — Prisma Schema (SQLite)
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Points (DOOH locations / screens) ──────────────────────
+
+model Point {
+  id                      String   @id @default(cuid())
+  name                    String
+  slug                    String   @unique
+  type                    String   // Elevadores | Indoors | Paineis de Led | FrontLights | BackLights
+  city                    String   @default("")
+  address                 String   @default("")
+  description             String   @default("")
+  insertionType           String   @default("")
+  minimumInsertions       Int?
+  targetAudience          String   @default("")
+  audienceClassification  String   @default("")
+
+  // Media
+  thumbnailUrl  String @default("")
+  baseMediaUrl  String @default("")
+  baseMediaType String @default("image") // image | video
+  baseWidth     Int    @default(0)
+  baseHeight    Int    @default(0)
+
+  // Screen
+  screenWidth     Int    @default(0)
+  screenHeight    Int    @default(0)
+  screenAspect    String @default("16:9")
+  fitMode         String @default("cover") // cover | contain
+  screenSelection String @default("{}") // JSON string of ScreenSelection
+
+  // Render
+  renderPreset String @default("{}") // JSON string of RenderPreset
+
+  // Environment
+  environmentType String @default("street") // street | shopping | elevator | pedestrian
+
+  published Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  simulations Simulation[]
+  campaignSimulations CampaignSimulation[]
+}
+
+// ─── Campaigns (multi-point planning) ───────────────────────
+
+model Campaign {
+  id             String   @id @default(cuid())
+  name           String
+  client         String   @default("")
+  description    String   @default("")
+  creativeUrl    String   @default("")
+  creativeType   String   @default("image")
+  creativeWidth  Int      @default(0)
+  creativeHeight Int      @default(0)
+  status         String   @default("draft") // draft | active | completed
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  simulations CampaignSimulation[]
+}
+
+model CampaignSimulation {
+  id         String   @id @default(cuid())
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  pointId    String
+  point      Point    @relation(fields: [pointId], references: [id], onDelete: Restrict)
+  renderUrl  String   @default("")
+  renderType String   @default("image")
+  status     String   @default("pending") // pending | rendered | exported
+  createdAt  DateTime @default(now())
+
+  @@unique([campaignId, pointId])
+}
+
+// ─── Leads (WhatsApp contacts captured) ─────────────────────
+
+model Lead {
+  id              String   @id @default(cuid())
+  name            String
+  company         String   @default("")
+  email           String   @default("")
+  whatsapp        String
+  pointName       String   @default("")
+  pointsSimulated Int      @default(0)
+  creativeUploaded Boolean @default(false)
+  videoRequest    Boolean  @default(false)
+  imageExport     Boolean  @default(false)
+  source          String   @default("unknown")
+  sessionId       String   @default("")
+  dateCreated     DateTime @default(now())
+  status          String   @default("new")
+}
+
+// ─── Simulations (log of simulations run) ───────────────────
+
+model Simulation {
+  id             String   @id @default(cuid())
+  pointId        String
+  point          Point    @relation(fields: [pointId], references: [id], onDelete: Cascade)
+  creativeType   String   // image | video
+  creativeWidth  Int
+  creativeHeight Int
+  createdAt      DateTime @default(now())
+}
