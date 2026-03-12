@@ -2,12 +2,21 @@
 @tailwind components;
 @tailwind utilities;
 
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Montserrat:wght@300;400;500;600&display=swap');
+
 :root {
-  --surface-0: #0a0a0b;
-  --surface-1: #111113;
-  --surface-2: #1a1a1e;
-  --surface-3: #242429;
-  --accent: #6366f1;
+  --surface-0: #000000;
+  --surface-1: #0a0a0a;
+  --surface-2: #141414;
+  --surface-3: #1e1e1e;
+  --accent: #FE5C2B;
+  --accent-hover: #ff6c40;
+  --text-primary: #FFFFFF;
+  --text-secondary: #a3a3a3;
+  --text-muted: #737373;
+  --glass-bg: rgba(0, 0, 0, 0.6);
+  --glass-border: rgba(255, 255, 255, 0.06);
+  --card-bg: rgba(255, 255, 255, 0.04);
 }
 
 * {
@@ -18,40 +27,147 @@
 
 body {
   background: var(--surface-0);
-  color: #e4e4e7;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: var(--text-primary);
+  font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 14px;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Canvas overlay for corner editing */
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Poppins', sans-serif;
+}
+
+/* ─── Scrollbar ───────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* ─── Corner Handles ──────────────────────────────────── */
 .corner-handle {
   width: 14px;
   height: 14px;
-  border: 2px solid #6366f1;
-  background: rgba(99, 102, 241, 0.3);
+  border: 2px solid var(--accent);
+  background: rgba(254, 92, 43, 0.3);
   border-radius: 50%;
   position: absolute;
   transform: translate(-50%, -50%);
   cursor: grab;
   z-index: 20;
-  transition: background 0.15s;
+  transition: background 0.15s, box-shadow 0.15s;
 }
 
 .corner-handle:hover,
 .corner-handle:active {
-  background: rgba(99, 102, 241, 0.7);
+  background: rgba(254, 92, 43, 0.7);
+  box-shadow: 0 0 12px rgba(254, 92, 43, 0.5);
   cursor: grabbing;
 }
 
-/* Zoom lens */
+/* ─── Zoom Lens ───────────────────────────────────────── */
 .zoom-lens {
   position: fixed;
   width: 120px;
   height: 120px;
   border-radius: 50%;
-  border: 2px solid rgba(99, 102, 241, 0.6);
+  border: 2px solid rgba(254, 92, 43, 0.6);
   overflow: hidden;
   pointer-events: none;
   z-index: 100;
   image-rendering: pixelated;
+}
+
+/* ─── Custom Range Slider ─────────────────────────────── */
+input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.12);
+  outline: none;
+  transition: background 0.18s;
+}
+
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: 2px solid #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+input[type='range']::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 2px 10px rgba(254, 92, 43, 0.4);
+}
+
+input[type='range']::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: 2px solid #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* ─── Floating panel glass effect ─────────────────────── */
+.glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+  box-shadow: 0px 10px 30px rgba(0, 0, 0, 0.4);
+}
+
+/* ─── Animations ──────────────────────────────────────── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.22s ease-out both;
+}
+
+.animate-slide-in {
+  animation: slideInLeft 0.2s ease-out both;
+}
+
+@keyframes impact-sweep {
+  0% {
+    opacity: 0;
+    background: linear-gradient(90deg, transparent 0%, rgba(254,92,43,0.18) 50%, transparent 100%);
+    transform: translateX(-100%);
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(100%);
+  }
 }

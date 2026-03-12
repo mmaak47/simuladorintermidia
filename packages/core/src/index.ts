@@ -4,3 +4,4 @@ export * from './perspective';
 export * from './geometry';
 export * from './scene-match';
 export * from './api-client';
+export * from './interpolation';

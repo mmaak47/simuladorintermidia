@@ -30,10 +30,12 @@ CUSTOM_MODEL_PATH = os.environ.get("YOLO_SCREEN_MODEL", "")
 GENERIC_MODEL_NAME = os.environ.get("YOLO_GENERIC_MODEL", "yolov8n.pt")
 
 # COCO class names that might represent a display/screen
-SCREEN_LIKE_CLASSES = {"tv", "monitor", "laptop", "cell phone"}
+# Note: COCO has 'tv' (class 62), 'laptop' (63), 'cell phone' (67)
+# "monitor" is NOT a COCO class — omitted to avoid silent mismatches.
+SCREEN_LIKE_CLASSES = {"tv", "laptop", "cell phone"}
 
 # Minimum confidence to consider at all
-MIN_CONFIDENCE = 0.15
+MIN_CONFIDENCE = 0.25
 
 # ── Singleton loader ─────────────────────────────────────────
 
@@ -116,10 +118,14 @@ def detect_screens(
         if screen_dets:
             detections = screen_dets
         else:
-            # No screen-like classes found — keep the top detections by area
-            # (large rectangles are likely the screen frame we care about)
-            detections.sort(key=lambda d: d.bbox.area, reverse=True)
-            detections = detections[:5]
+            # No screen-like classes detected — return empty.
+            # The hybrid pipeline will fall back to geometric detection.
+            logger.info(
+                "YOLO found %d objects but none are screen-like classes. "
+                "Returning empty for geometric fallback.",
+                len(detections),
+            )
+            return []
 
     # Rank
     detections = rank_candidates(detections, w, h)

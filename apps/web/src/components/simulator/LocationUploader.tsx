@@ -19,10 +19,14 @@ export function LocationUploader() {
 
       if (isVideo) {
         const video = document.createElement('video');
-        video.src = url;
+        video.preload = 'metadata';
+        video.muted = true;
+        video.playsInline = true;
         video.addEventListener('loadedmetadata', () => {
           setLocation(url, mediaType, video.videoWidth, video.videoHeight);
         });
+        video.src = url;
+        video.load();
       } else {
         const img = new Image();
         img.src = url;
@@ -42,7 +46,7 @@ export function LocationUploader() {
   if (location) {
     return (
       <div className="space-y-2">
-        <div className="text-xs text-zinc-500 truncate">
+        <div className="text-label text-neutral-400 truncate font-body">
           {location.type === 'video' ? '🎬' : '📷'} {location.width}×{location.height}
         </div>
         <button
@@ -50,7 +54,7 @@ export function LocationUploader() {
             reset();
             if (inputRef.current) inputRef.current.value = '';
           }}
-          className="text-xs text-red-400 hover:text-red-300"
+          className="text-label text-red-400 hover:text-red-300 font-body transition-colors"
         >
           Remover
         </button>
@@ -60,9 +64,16 @@ export function LocationUploader() {
 
   return (
     <div>
-      <label className="flex flex-col items-center justify-center h-28 border-2 border-dashed border-zinc-700 rounded-lg cursor-pointer hover:border-accent transition-colors">
-        <span className="text-sm text-zinc-500">Arraste ou clique para upload</span>
-        <span className="text-xs text-zinc-600 mt-1">Foto ou vídeo da tela</span>
+      <label className="flex flex-col items-center justify-center h-28 border-2 border-dashed border-white/10 rounded-panel cursor-pointer hover:border-accent transition-colors duration-200 group">
+        <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center mb-2 group-hover:bg-accent/10 transition-colors">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-neutral-500 group-hover:text-accent transition-colors">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="17 8 12 3 7 8" />
+            <line x1="12" y1="3" x2="12" y2="15" />
+          </svg>
+        </div>
+        <span className="text-label text-neutral-400 font-body">Arraste ou clique para upload</span>
+        <span className="text-[11px] text-neutral-600 mt-0.5 font-body">Foto ou vídeo da tela</span>
         <input
           ref={inputRef}
           type="file"

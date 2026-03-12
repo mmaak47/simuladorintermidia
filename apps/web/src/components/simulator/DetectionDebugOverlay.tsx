@@ -30,44 +30,44 @@ export function DetectionDebugOverlay() {
     <div className="space-y-2">
       <button
         onClick={() => setShow((v) => !v)}
-        className="w-full rounded-md border border-zinc-700 px-3 py-1.5 text-xs text-zinc-400 hover:border-accent transition-colors"
+        className="w-full rounded-lg border border-white/10 px-3 py-2 text-label text-neutral-400 font-body hover:border-accent transition-colors"
       >
         {show ? 'Ocultar debug' : 'Mostrar detecção'}
       </button>
 
       {show && (
         <div className="space-y-1.5">
-          <label className="flex items-center gap-2 text-xs text-zinc-500 cursor-pointer">
+          <label className="flex items-center gap-2 text-label text-neutral-500 font-body cursor-pointer">
             <input
               type="checkbox"
               checked={layers.bbox}
               onChange={() => setLayers((l) => ({ ...l, bbox: !l.bbox }))}
-              className="accent-green-500"
+              className="accent-green-500 rounded"
             />
             Mostrar YOLO bbox
           </label>
-          <label className="flex items-center gap-2 text-xs text-zinc-500 cursor-pointer">
+          <label className="flex items-center gap-2 text-label text-neutral-500 font-body cursor-pointer">
             <input
               type="checkbox"
               checked={layers.mask}
               onChange={() => setLayers((l) => ({ ...l, mask: !l.mask }))}
-              className="accent-purple-500"
+              className="accent-purple-500 rounded"
             />
             Mostrar máscara SAM
           </label>
-          <label className="flex items-center gap-2 text-xs text-zinc-500 cursor-pointer">
+          <label className="flex items-center gap-2 text-label text-neutral-500 font-body cursor-pointer">
             <input
               type="checkbox"
               checked={layers.contour}
               onChange={() => setLayers((l) => ({ ...l, contour: !l.contour }))}
-              className="accent-blue-500"
+              className="accent-blue-500 rounded"
             />
             Mostrar contorno final
           </label>
 
           {/* Pipeline stages */}
-          <details className="text-[10px] text-zinc-600">
-            <summary className="cursor-pointer hover:text-zinc-400">
+          <details className="text-[10px] text-neutral-600 font-body">
+            <summary className="cursor-pointer hover:text-neutral-400">
               Pipeline ({debug.pipeline_stages.length} etapas)
             </summary>
             <ol className="list-decimal list-inside mt-1 space-y-0.5">

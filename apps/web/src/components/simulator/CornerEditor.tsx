@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from 'react';
 import { useCompositionStore } from '@/store/composition-store';
+import { ZoomLens, findEdgeSnap } from './ZoomLens';
 
 /**
  * Overlay for dragging screen corners on the preview image.
@@ -9,9 +10,13 @@ import { useCompositionStore } from '@/store/composition-store';
  * Shows a zoom lens with coordinates while dragging.
  */
 export function CornerEditor() {
-  const { location, corners, updateCorner } = useCompositionStore();
+  const { location, corners, updateCorner, keyframeData, activeKeyframeIndex, updateKeyframeCorner } = useCompositionStore();
   const [dragging, setDragging] = useState<number | null>(null);
   const [zoomPos, setZoomPos] = useState({ x: 0, y: 0 });
+  const [imgCoords, setImgCoords] = useState({ x: 0, y: 0 });
+
+  // In keyframe edit mode, corner drags must also update keyframe data
+  const isKeyframeEditMode = !!keyframeData;
 
   /** Get the canvas element and its rendered rect */
   const getCanvasRect = useCallback(() => {
@@ -58,12 +63,25 @@ export function CornerEditor() {
     (e: React.PointerEvent) => {
       if (dragging === null) return;
       const coords = toImageCoords(e);
-      if (coords) {
-        updateCorner(dragging, coords.x, coords.y);
-        setZoomPos({ x: e.clientX, y: e.clientY });
+      if (!coords) return;
+
+      let { x, y } = coords;
+
+      // Light edge snapping
+      const canvas = document.querySelector('main canvas') as HTMLCanvasElement | null;
+      if (canvas) {
+        const snap = findEdgeSnap(canvas, x, y);
+        if (snap) { x = snap.x; y = snap.y; }
       }
+
+      updateCorner(dragging, x, y);
+      if (isKeyframeEditMode) {
+        updateKeyframeCorner(dragging, x, y);
+      }
+      setImgCoords({ x, y });
+      setZoomPos({ x: e.clientX, y: e.clientY });
     },
-    [dragging, toImageCoords, updateCorner],
+    [dragging, toImageCoords, updateCorner, isKeyframeEditMode, updateKeyframeCorner],
   );
 
   const handlePointerUp = useCallback(() => {
@@ -92,8 +110,8 @@ export function CornerEditor() {
       >
         <polygon
           points={corners.map((c) => `${c.x},${c.y}`).join(' ')}
-          fill="rgba(99, 102, 241, 0.06)"
-          stroke="rgba(99, 102, 241, 0.6)"
+          fill="rgba(254, 92, 43, 0.06)"
+          stroke="rgba(254, 92, 43, 0.6)"
           strokeWidth={Math.max(location.width, location.height) * 0.002}
           strokeDasharray={`${location.width * 0.005} ${location.width * 0.003}`}
         />
@@ -117,20 +135,14 @@ export function CornerEditor() {
         );
       })}
 
-      {/* Zoom lens while dragging */}
-      {dragging !== null && corners[dragging] && (
-        <div
-          className="zoom-lens"
-          style={{
-            left: zoomPos.x + 20,
-            top: zoomPos.y - 80,
-          }}
-        >
-          <div className="text-[10px] text-center text-zinc-400 mt-12">
-            {Math.round(corners[dragging].x)}, {Math.round(corners[dragging].y)}
-          </div>
-        </div>
-      )}
+      {/* Precision zoom lens while dragging */}
+      <ZoomLens
+        imageX={imgCoords.x}
+        imageY={imgCoords.y}
+        screenX={zoomPos.x}
+        screenY={zoomPos.y}
+        visible={dragging !== null}
+      />
     </div>
   );
 }

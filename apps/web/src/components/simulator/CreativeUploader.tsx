@@ -16,7 +16,9 @@ export function CreativeUploader() {
 
       if (isVideo) {
         const video = document.createElement('video');
-        video.src = url;
+        video.preload = 'metadata';
+        video.muted = true;
+        video.playsInline = true;
         video.addEventListener('loadedmetadata', () => {
           setCreative({
             url,
@@ -26,6 +28,8 @@ export function CreativeUploader() {
             duration: video.duration,
           });
         });
+        video.src = url;
+        video.load();
       } else {
         const img = new Image();
         img.src = url;
@@ -50,7 +54,7 @@ export function CreativeUploader() {
   if (creative) {
     return (
       <div className="space-y-2">
-        <div className="text-xs text-zinc-500">
+        <div className="text-label text-neutral-400 font-body">
           {creative.type === 'video' ? '🎬' : '🖼️'} {creative.width}×{creative.height}
           {creative.duration ? ` • ${creative.duration.toFixed(1)}s` : ''}
         </div>
@@ -59,7 +63,7 @@ export function CreativeUploader() {
             setCreative(null as unknown as CreativeSource);
             if (inputRef.current) inputRef.current.value = '';
           }}
-          className="text-xs text-red-400 hover:text-red-300"
+          className="text-label text-red-400 hover:text-red-300 font-body transition-colors"
         >
           Remover criativo
         </button>
@@ -68,9 +72,16 @@ export function CreativeUploader() {
   }
 
   return (
-    <label className="flex flex-col items-center justify-center h-24 border-2 border-dashed border-zinc-700 rounded-lg cursor-pointer hover:border-accent transition-colors">
-      <span className="text-sm text-zinc-500">Upload do criativo</span>
-      <span className="text-xs text-zinc-600 mt-1">Imagem ou vídeo do anúncio</span>
+    <label className="flex flex-col items-center justify-center h-24 border-2 border-dashed border-white/10 rounded-panel cursor-pointer hover:border-accent transition-colors duration-200 group">
+      <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center mb-2 group-hover:bg-accent/10 transition-colors">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-neutral-500 group-hover:text-accent transition-colors">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+          <circle cx="8.5" cy="8.5" r="1.5" />
+          <polyline points="21 15 16 10 5 21" />
+        </svg>
+      </div>
+      <span className="text-label text-neutral-400 font-body">Upload do criativo</span>
+      <span className="text-[11px] text-neutral-600 mt-0.5 font-body">Imagem ou vídeo do anúncio</span>
       <input
         ref={inputRef}
         type="file"

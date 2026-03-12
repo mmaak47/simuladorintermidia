@@ -1,5 +1,5 @@
 """
-DOOH Simulator — Vision API
+Simulador Intermidia — Vision API
 FastAPI backend for screen segmentation (SAM), contour extraction (OpenCV),
 video tracking, and export.
 """
@@ -11,16 +11,22 @@ import os
 
 from routers import segmentation, tracking, export as export_router
 from routers import hybrid_detect
+from routers import keyframes
+from routers import attention
 
 app = FastAPI(
     title="DOOH Vision API",
     version="0.1.0",
-    description="Computer vision backend for cinematic DOOH simulator",
+    description="Computer vision backend for Simulador Intermidia",
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://192.168.0.46:3000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -40,6 +46,8 @@ app.mount("/files/exports", StaticFiles(directory="exports"), name="exports")
 app.include_router(segmentation.router, prefix="/api/vision", tags=["vision"])
 app.include_router(hybrid_detect.router, prefix="/api/vision", tags=["vision"])
 app.include_router(tracking.router, prefix="/api/vision", tags=["vision"])
+app.include_router(keyframes.router, prefix="/api/vision", tags=["vision"])
+app.include_router(attention.router, prefix="/api/vision", tags=["vision"])
 app.include_router(export_router.router, prefix="/api/export", tags=["export"])
 
 

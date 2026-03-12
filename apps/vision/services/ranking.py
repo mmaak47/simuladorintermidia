@@ -7,7 +7,7 @@ Scoring formula:
         + centrality_score * 0.1
         + aspect_ratio_score * 0.1
 
-Prefers large, centered, vertically-oriented screen regions.
+Prefers large, centered screen regions with reasonable aspect ratios.
 """
 
 import math
@@ -44,16 +44,20 @@ def rank_candidates(
         dist = math.hypot(bcx - cx_img, bcy - cy_img)
         centrality = 1.0 - min(dist / max_dist, 1.0) if max_dist > 0 else 0.5
 
-        # 4. Aspect ratio score (0–1): prefer vertical (portrait) screens
-        w, h = bbox.width, bbox.height
-        if w > 0 and h > 0:
-            ratio = h / w  # >1 = portrait
-            # Best score when ratio ∈ [1.2, 3.0]; still okay when ~1
-            if ratio >= 1.2:
-                aspect_score = min(ratio / 3.0, 1.0)
+        # 4. Aspect ratio score (0–1): prefer reasonable screen-like ratios
+        #    Screens can be portrait OR landscape; penalise extreme ratios.
+        bw, bh = bbox.width, bbox.height
+        if bw > 0 and bh > 0:
+            ratio = max(bw, bh) / min(bw, bh)  # always >= 1
+            # Best: ratio in [1.0, 3.0] → score 1.0
+            # Okay: ratio in [3.0, 6.0] → linear decay to 0.3
+            # Bad:  ratio > 6.0 → 0.1
+            if ratio <= 3.0:
+                aspect_score = 1.0
+            elif ratio <= 6.0:
+                aspect_score = 1.0 - 0.7 * ((ratio - 3.0) / 3.0)
             else:
-                # landscape still gets partial credit
-                aspect_score = max(ratio / 1.2, 0.0) * 0.6
+                aspect_score = 0.1
         else:
             aspect_score = 0.0
 

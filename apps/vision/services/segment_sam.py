@@ -1,8 +1,9 @@
 """
 SAM segmentation service — crop-aware refinement.
 
-Runs SAM only within the YOLO-detected crop region, using:
-  - 1 positive point near crop center (where the screen is)
+Runs SAM within the YOLO/geometric-detected crop region, using:
+  - A box prompt covering the (unpadded) bbox region for strong guidance
+  - 1 positive point at crop center
   - 4 negative points near crop borders (background / frame edges)
 
 Chooses the best mask by area, rectangularity, and coverage of the crop.
@@ -19,14 +20,12 @@ import cv2
 logger = logging.getLogger(__name__)
 
 # ── SAM predictor singleton ──────────────────────────────────
-# Reuse from existing sam_service (keeps model in memory)
 from services.sam_service import get_sam_predictor
 
 # Minimum mask coverage relative to crop area to be accepted
 MIN_MASK_COVERAGE = 0.10
 
-# Penalty threshold for nested rectangles: masks smaller than this
-# fraction of the crop area are penalised heavily.
+# Penalty threshold for nested rectangles
 NESTED_PENALTY_THRESHOLD = 0.45
 
 
@@ -41,16 +40,12 @@ def segment_screen_in_crop(
     """
     Run SAM inside a padded crop of the full image.
 
-    Args:
-        full_image_rgb: H×W×3 uint8 RGB.
-        crop_x1..crop_y2: YOLO bounding box (pixels, clipped to image).
-        padding: fraction of crop dimensions to add around the bbox.
+    Uses box prompts (strong) + point prompts (refinement) for accurate
+    screen segmentation. The box prompt covers the original (unpadded)
+    YOLO/geometric bbox, giving SAM a clear spatial hint.
 
     Returns:
         (mask_fullsize, confidence, mask_url)
-         - mask_fullsize: H×W bool array in full-image coordinates.
-         - confidence: SAM score of best mask.
-         - mask_url: path to saved mask PNG (for debug/frontend).
     """
     img_h, img_w = full_image_rgb.shape[:2]
 
@@ -71,12 +66,19 @@ def segment_screen_in_crop(
     if ch < 10 or cw < 10:
         raise ValueError("Crop region too small for SAM segmentation")
 
-    # ── Build prompt points ───────────────────────────────────
-    # Positive: center of the original bbox (inside crop coords)
+    # ── Build box prompt (original bbox in crop coords) ───────
+    # This tells SAM "the screen is approximately in this box"
+    box_in_crop = np.array([
+        crop_x1 - cx1,   # x1
+        crop_y1 - cy1,   # y1
+        crop_x2 - cx1,   # x2
+        crop_y2 - cy1,   # y2
+    ], dtype=np.float32)
+
+    # ── Build point prompts ───────────────────────────────────
     center_x = (crop_x1 + crop_x2) / 2.0 - cx1
     center_y = (crop_y1 + crop_y2) / 2.0 - cy1
 
-    # Negative: near each edge of the crop (outside the screen)
     margin_x = cw * 0.05
     margin_y = ch * 0.05
 
@@ -90,13 +92,14 @@ def segment_screen_in_crop(
 
     point_labels = np.array([1, 0, 0, 0, 0], dtype=np.int32)
 
-    # ── Run SAM ───────────────────────────────────────────────
+    # ── Run SAM with box + point prompts ──────────────────────
     predictor = get_sam_predictor()
     predictor.set_image(crop)
 
     masks, scores, _ = predictor.predict(
         point_coords=point_coords,
         point_labels=point_labels,
+        box=box_in_crop[None, :],  # SAM expects shape (1, 4)
         multimask_output=True,
     )
 
