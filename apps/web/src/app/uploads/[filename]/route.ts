@@ -45,6 +45,9 @@ export async function GET(
         'Content-Type': getContentType(fileName),
         'Content-Length': String(info.size),
         'Cache-Control': 'public, max-age=31536000, immutable',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET',
+        'Vary': 'Origin',
       },
     });
   } catch {

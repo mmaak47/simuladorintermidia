@@ -127,6 +127,8 @@ export function WebGLPreviewCanvas({ onFirstRender, onWebGLError }: WebGLPreview
   const [creativeImage, setCreativeImage] = useState<HTMLImageElement | null>(null);
   const [creativeVideo, setCreativeVideo] = useState<HTMLVideoElement | null>(null);
   const [containerSize, setContainerSize] = useState({ w: 0, h: 0 });
+  const [bgLoading, setBgLoading] = useState(false);
+  const [bgError, setBgError] = useState(false);
 
   useEffect(() => {
     firstRenderFiredRef.current = false;
@@ -157,16 +159,25 @@ export function WebGLPreviewCanvas({ onFirstRender, onWebGLError }: WebGLPreview
     if (!location) {
       setBgImage(null);
       setBgVideo(null);
+      setBgLoading(false);
+      setBgError(false);
       return;
     }
 
+    setBgError(false);
+
     if (location.type === 'image') {
       const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => setBgImage(img);
-      img.onerror = () => setBgImage(null);
+      setBgLoading(true);
+      img.onload = () => { setBgImage(img); setBgLoading(false); };
+      img.onerror = () => {
+        setBgImage(null);
+        setBgLoading(false);
+        setBgError(true);
+        onWebGLError?.();
+      };
       img.src = location.url;
-      if (img.complete && img.naturalWidth > 0) setBgImage(img);
+      if (img.complete && img.naturalWidth > 0) { setBgImage(img); setBgLoading(false); }
       return () => {
         img.onload = null;
         img.onerror = null;
@@ -187,7 +198,11 @@ export function WebGLPreviewCanvas({ onFirstRender, onWebGLError }: WebGLPreview
 
     video.addEventListener('canplaythrough', onReady, { once: true });
     video.addEventListener('canplay', onReady, { once: true });
-    video.addEventListener('error', () => setBgVideo(null), { once: true });
+    video.addEventListener('error', () => {
+      setBgVideo(null);
+      setBgError(true);
+      onWebGLError?.();
+    }, { once: true });
     video.src = location.url;
     video.load();
 
@@ -432,6 +447,22 @@ export function WebGLPreviewCanvas({ onFirstRender, onWebGLError }: WebGLPreview
   return (
     <div ref={containerRef} className="absolute inset-0 flex items-center justify-center p-4">
       <div ref={mountRef} className="block" />
+      {bgLoading && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-8 h-8 rounded-full border-2 border-accent border-t-transparent animate-spin" />
+            <span className="text-xs text-neutral-500 font-body">Carregando imagem...</span>
+          </div>
+        </div>
+      )}
+      {bgError && !bgLoading && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="flex flex-col items-center gap-2 text-center px-8">
+            <span className="text-2xl">⚠️</span>
+            <span className="text-xs text-neutral-500 font-body">Imagem base não disponível para este ponto</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
