@@ -20,6 +20,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY package.json turbo.json tsconfig.json ./
 COPY packages/ packages/
 COPY apps/web/ apps/web/
+RUN mkdir -p /app/apps/web/public /app/apps/web/generated
 
 # Generate Prisma client + run build
 WORKDIR /app/apps/web
