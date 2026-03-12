@@ -347,16 +347,14 @@ export const useCompositionStore = create<CompositionStore>((set, get) => ({
    */
   loadPointPreset: (preset) => {
     const faces = normalizeScreenFaces(preset.screenSelection);
-    const locationPart = preset.baseMediaUrl
+    const location = preset.baseMediaUrl
       ? {
-          location: {
-            url: preset.baseMediaUrl,
-            type: preset.baseMediaType as MediaType,
-            width: preset.baseWidth,
-            height: preset.baseHeight,
-          },
+          url: preset.baseMediaUrl,
+          type: preset.baseMediaType as MediaType,
+          width: preset.baseWidth,
+          height: preset.baseHeight,
         }
-      : {};
+      : null;
 
     // Derive spill settings from the point's render preset
     const spillFromPreset: typeof DEFAULT_SPILL_SETTINGS = {
@@ -368,7 +366,7 @@ export const useCompositionStore = create<CompositionStore>((set, get) => ({
     };
 
     set({
-      ...locationPart,
+      location,
       segmentation: null,
       hybridDetection: null,
       faces,
