@@ -31,7 +31,7 @@ RUN cd /app && npx turbo build --filter=@dooh/web
 
 # ── Stage 3: Production runner ─────────────────────────────
 FROM node:20-bookworm-slim AS runner
-WORKDIR /app
+WORKDIR /app/apps/web
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -39,17 +39,16 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Copy build output
-COPY --from=builder /app/apps/web/.next/standalone ./
-COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
-COPY --from=builder /app/apps/web/public ./apps/web/public
-COPY --from=builder /app/apps/web/generated ./apps/web/generated
-
-# Copy Prisma schema + migrations for runtime
-COPY --from=builder /app/apps/web/prisma ./apps/web/prisma
+# Copy runtime deps and build artifacts
+COPY --from=builder /app/node_modules /app/node_modules
+COPY --from=builder /app/apps/web/package.json ./package.json
+COPY --from=builder /app/apps/web/.next ./.next
+COPY --from=builder /app/apps/web/public ./public
+COPY --from=builder /app/apps/web/generated ./generated
+COPY --from=builder /app/apps/web/prisma ./prisma
 
 # SQLite database will be mounted as a volume
-RUN mkdir -p /app/apps/web/prisma /data
+RUN mkdir -p /data
 RUN chown -R nextjs:nodejs /app /data
 
 USER nextjs
@@ -59,4 +58,4 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-CMD ["node", "server.js"]
+CMD ["npx", "next", "start", "--hostname", "0.0.0.0", "--port", "3000"]
