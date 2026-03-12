@@ -13,38 +13,77 @@ export default function PointMediaPage() {
 
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [preview, setPreview] = useState<string | null>(point?.baseMediaUrl || null);
   const [mediaType, setMediaType] = useState<'image' | 'video'>(point?.baseMediaType ?? 'image');
+
+  const getMediaDimensions = useCallback((file: File, isVideo: boolean) => {
+    return new Promise<{ w: number; h: number }>((resolve, reject) => {
+      const localUrl = URL.createObjectURL(file);
+      const timeoutId = window.setTimeout(() => {
+        URL.revokeObjectURL(localUrl);
+        reject(new Error('Timeout ao ler dimensoes da midia'));
+      }, 15000);
+
+      if (isVideo) {
+        const vid = document.createElement('video');
+        vid.preload = 'metadata';
+        vid.muted = true;
+        vid.onloadedmetadata = () => {
+          window.clearTimeout(timeoutId);
+          const dims = { w: vid.videoWidth, h: vid.videoHeight };
+          URL.revokeObjectURL(localUrl);
+          resolve(dims);
+        };
+        vid.onerror = () => {
+          window.clearTimeout(timeoutId);
+          URL.revokeObjectURL(localUrl);
+          reject(new Error('Nao foi possivel ler o video enviado'));
+        };
+        vid.src = localUrl;
+        vid.load();
+        return;
+      }
+
+      const img = new Image();
+      img.onload = () => {
+        window.clearTimeout(timeoutId);
+        const dims = { w: img.naturalWidth, h: img.naturalHeight };
+        URL.revokeObjectURL(localUrl);
+        resolve(dims);
+      };
+      img.onerror = () => {
+        window.clearTimeout(timeoutId);
+        URL.revokeObjectURL(localUrl);
+        reject(new Error('Nao foi possivel ler a imagem enviada'));
+      };
+      img.src = localUrl;
+    });
+  }, []);
 
   const handleFile = useCallback(
     async (file: File) => {
       const isVideo = file.type.startsWith('video/');
       setMediaType(isVideo ? 'video' : 'image');
+      setUploadError(null);
       setUploading(true);
 
       try {
+        const dimensions = await getMediaDimensions(file, isVideo);
+
         // Upload to server
         const form = new FormData();
         form.append('file', file);
-        const res = await fetch('/api/upload', { method: 'POST', body: form });
-        if (!res.ok) throw new Error('Upload failed');
-        const data = await res.json();
+        const controller = new AbortController();
+        const abortTimer = window.setTimeout(() => controller.abort(), 120000);
+        const res = await fetch('/api/upload', { method: 'POST', body: form, signal: controller.signal });
+        window.clearTimeout(abortTimer);
 
-        // Extract dimensions
-        const dimensions = await new Promise<{ w: number; h: number }>((resolve) => {
-          if (isVideo) {
-            const vid = document.createElement('video');
-            vid.preload = 'metadata';
-            vid.muted = true;
-            vid.onloadedmetadata = () => resolve({ w: vid.videoWidth, h: vid.videoHeight });
-            vid.src = data.url;
-            vid.load();
-          } else {
-            const img = new Image();
-            img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
-            img.src = data.url;
-          }
-        });
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(text || 'Upload failed');
+        }
+        const data = await res.json();
 
         // Persist to point store
         updateMedia(id, {
@@ -57,11 +96,12 @@ export default function PointMediaPage() {
         setPreview(data.url);
       } catch (err) {
         console.error('Upload error:', err);
+        setUploadError(err instanceof Error ? err.message : 'Falha no upload');
       } finally {
         setUploading(false);
       }
     },
-    [id, updateMedia],
+    [getMediaDimensions, id, updateMedia],
   );
 
   if (!point) {
@@ -96,6 +136,11 @@ export default function PointMediaPage() {
 
           {/* Upload area */}
           <div className="space-y-4">
+            {uploadError ? (
+              <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200 font-body">
+                Falha no upload: {uploadError}
+              </div>
+            ) : null}
             {preview ? (
               <div className="rounded-panel border border-white/10 overflow-hidden bg-surface-1">
                 {mediaType === 'video' ? (
@@ -142,7 +187,8 @@ export default function PointMediaPage() {
                   className="hidden"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
-                    if (file) handleFile(file);
+                    if (file) void handleFile(file);
+                    e.currentTarget.value = '';
                   }}
                 />
               </label>
