@@ -1,9 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
+import { writeFile, mkdir, unlink } from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';
 
 const UPLOAD_DIR = path.join(process.cwd(), 'public', 'uploads');
+
+function getLocalUploadPath(rawUrl: string): string | null {
+  try {
+    const parsed = new URL(rawUrl, 'http://localhost');
+    if (!parsed.pathname.startsWith('/uploads/')) return null;
+
+    const fileName = path.basename(parsed.pathname);
+    if (!fileName) return null;
+
+    const filePath = path.join(UPLOAD_DIR, fileName);
+    const normalizedUploadDir = path.resolve(UPLOAD_DIR) + path.sep;
+    const normalizedFilePath = path.resolve(filePath);
+
+    if (!normalizedFilePath.startsWith(normalizedUploadDir)) return null;
+    return normalizedFilePath;
+  } catch {
+    return null;
+  }
+}
 
 export async function POST(req: NextRequest) {
   const formData = await req.formData();
@@ -42,4 +61,23 @@ export async function POST(req: NextRequest) {
     type: file.type.startsWith('video/') ? 'video' : 'image',
     name: file.name,
   });
+}
+
+export async function DELETE(req: NextRequest) {
+  const body = await req.json().catch(() => null) as { url?: string } | null;
+  if (!body?.url) {
+    return NextResponse.json({ error: 'url is required' }, { status: 400 });
+  }
+
+  const filePath = getLocalUploadPath(body.url);
+  if (!filePath) {
+    return NextResponse.json({ error: 'invalid upload url' }, { status: 400 });
+  }
+
+  try {
+    await unlink(filePath);
+    return NextResponse.json({ ok: true });
+  } catch {
+    return NextResponse.json({ ok: true });
+  }
 }

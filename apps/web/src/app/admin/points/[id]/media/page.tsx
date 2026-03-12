@@ -17,6 +17,14 @@ export default function PointMediaPage() {
   const [preview, setPreview] = useState<string | null>(point?.baseMediaUrl || null);
   const [mediaType, setMediaType] = useState<'image' | 'video'>(point?.baseMediaType ?? 'image');
 
+  const deleteUploadedMedia = useCallback(async (url: string) => {
+    await fetch('/api/upload', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    });
+  }, []);
+
   const getMediaDimensions = useCallback((file: File, isVideo: boolean) => {
     return new Promise<{ w: number; h: number }>((resolve, reject) => {
       const localUrl = URL.createObjectURL(file);
@@ -153,9 +161,18 @@ export default function PointMediaPage() {
                     {mediaType === 'video' ? '🎬 Vídeo' : '📷 Imagem'} — {point.baseWidth}×{point.baseHeight}
                   </div>
                   <button
-                    onClick={() => {
+                    onClick={async () => {
+                      const currentUrl = point.baseMediaUrl;
                       setPreview(null);
                       updateMedia(id, { baseMediaUrl: '', baseMediaType: 'image', baseWidth: 0, baseHeight: 0, thumbnailUrl: '' });
+
+                      if (currentUrl?.startsWith('/uploads/')) {
+                        try {
+                          await deleteUploadedMedia(currentUrl);
+                        } catch (err) {
+                          console.error('Delete upload error:', err);
+                        }
+                      }
                     }}
                     className="text-label text-red-400 hover:text-red-300 font-body transition-colors"
                   >
