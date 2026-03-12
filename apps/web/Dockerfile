@@ -36,12 +36,15 @@ WORKDIR /app/apps/web
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/*
+
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
 # Copy runtime deps and build artifacts
 COPY --from=builder /app/node_modules /app/node_modules
 COPY --from=builder /app/apps/web/package.json ./package.json
+COPY --from=builder /app/apps/web/prisma.config.ts ./prisma.config.ts
 COPY --from=builder /app/apps/web/.next ./.next
 COPY --from=builder /app/apps/web/public ./public
 COPY --from=builder /app/apps/web/generated ./generated
