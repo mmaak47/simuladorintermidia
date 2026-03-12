@@ -1,0 +1,17 @@
+node_modules
+.next
+.git
+*.log
+__pycache__
+*.pyc
+*.pyo
+.env
+.env.local
+apps/vision/sam_weights/*.pth
+apps/vision/yolov8n.pt
+apps/vision/uploads/*
+apps/vision/exports/*
+apps/vision/masks/*
+apps/web/prisma/dev.db
+apps/web/prisma/dev.db-journal
+apps/web/generated
