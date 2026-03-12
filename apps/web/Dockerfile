@@ -23,6 +23,7 @@ COPY apps/web/ apps/web/
 
 # Generate Prisma client + run build
 WORKDIR /app/apps/web
+ENV DATABASE_URL=file:/data/dooh.db
 RUN npx prisma generate
 ENV DOCKER_BUILD=1
 RUN cd /app && npx turbo build --filter=@dooh/web

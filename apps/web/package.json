@@ -2,6 +2,7 @@
   "name": "@dooh/web",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "npm@10.0.0",
   "scripts": {
     "dev": "next dev --port 3000",
     "build": "next build",
@@ -11,22 +12,33 @@
   "dependencies": {
     "@dooh/core": "*",
     "@dooh/render": "*",
+    "@prisma/adapter-better-sqlite3": "^7.4.2",
+    "@prisma/client": "^7.4.2",
+    "@react-three/drei": "^9.105.0",
+    "@react-three/fiber": "^8.16.0",
+    "better-sqlite3": "^12.6.2",
+    "framer-motion": "^11.18.2",
     "next": "^14.2.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
     "three": "^0.164.0",
-    "@react-three/fiber": "^8.16.0",
-    "@react-three/drei": "^9.105.0",
     "zustand": "^4.5.0"
   },
+  "prisma": {
+    "seed": "npx tsx prisma/seed.mts"
+  },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20.12.0",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
     "@types/three": "^0.164.0",
-    "typescript": "^5.4.0",
-    "tailwindcss": "^3.4.0",
+    "autoprefixer": "^10.4.0",
     "postcss": "^8.4.0",
-    "autoprefixer": "^10.4.0"
+    "prisma": "^7.4.2",
+    "tailwindcss": "^3.4.0",
+    "dotenv": "^16.4.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.4.0"
   }
 }
