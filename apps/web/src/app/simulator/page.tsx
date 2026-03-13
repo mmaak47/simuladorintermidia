@@ -75,6 +75,7 @@ export default function SimulatorPage() {
   // The active point shown in preview: hovered takes priority over selected
   const activePoint = hoveredPoint ?? selectedPoint;
   const isVideoPoint = activePoint?.baseMediaType === 'video';
+  const isStaticPrintPoint = activePoint?.type === 'FrontLights' || activePoint?.type === 'BackLights';
 
   // Track which point is currently loaded into composition store
   const loadedPointRef = useRef<string | null>(null);
@@ -143,7 +144,7 @@ export default function SimulatorPage() {
   }, []);
 
   const hasScreenSelection = !!corners;
-  const useLegacyPreview = webglFailed || faces.length > 1 || isNarrowViewport;
+  const useLegacyPreview = webglFailed || faces.length > 1 || isNarrowViewport || isStaticPrintPoint;
   const showSimulation = !!creative && hasScreenSelection && !!location;
   const isHoverPreview = !!hoveredPoint && hoveredPoint.id !== selectedPoint?.id;
   const liveInsertions = useInsertionCounter(
@@ -347,6 +348,7 @@ export default function SimulatorPage() {
               {useLegacyPreview ? (
                 <PreviewCanvas
                   readOnly
+                  panelType={activePoint?.type}
                   onFirstRender={isVideoPoint ? handleFirstRender : undefined}
                 />
               ) : (

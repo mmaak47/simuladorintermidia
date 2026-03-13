@@ -59,10 +59,11 @@ function getCornersForTime(
 interface PreviewCanvasProps {
   readOnly?: boolean;
   editorMode?: 'none' | 'basic' | 'perspective';
+  panelType?: string;
   onFirstRender?: (canvas: HTMLCanvasElement) => void;
 }
 
-export function PreviewCanvas({ readOnly = false, editorMode, onFirstRender }: PreviewCanvasProps) {
+export function PreviewCanvas({ readOnly = false, editorMode, panelType, onFirstRender }: PreviewCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const firstRenderFiredRef = useRef(false);
@@ -100,6 +101,7 @@ export function PreviewCanvas({ readOnly = false, editorMode, onFirstRender }: P
 
   const bgImage = useImageLoader(location?.url ?? null);
   const creativeImage = useImageLoader(creative?.type === 'image' ? creative.url : null);
+  const isStaticPrintSurface = panelType === 'FrontLights' || panelType === 'BackLights';
 
   // Reset spill edge color smoothing when creative changes
   useEffect(() => { resetEdgeColors(); firstRenderFiredRef.current = false; }, [creative]);
@@ -264,6 +266,11 @@ export function PreviewCanvas({ readOnly = false, editorMode, onFirstRender }: P
           realtime: isRealtimeVideo,
         });
 
+        // FrontLight/BackLight surfaces are printed media (lona/tecido), not LED.
+        if (isStaticPrintSurface) {
+          drawStaticMediaTexture(ctx, faceCorners, panelType);
+        }
+
         // 4. Light spill — screen light bleeding onto surrounding walls
         if (spill.enabled) {
           const edgeColors = sampleEdgeColors(ctx, faceCorners);
@@ -335,7 +342,7 @@ export function PreviewCanvas({ readOnly = false, editorMode, onFirstRender }: P
         ctx.restore();
       }
     }
-  }, [location, bgSource, bgVideo, creativeVideo, creativeSource, creative, corners, faces, tracking, keyframeData, keyframeCorners, segmentation, fitMode, display, cinematic, spill, timeOfDay, environment, ambient, autoTuneRequested, updateDisplay, updateCinematic, updateSpill, clearAutoTuneRequest, onFirstRender]);
+  }, [location, bgSource, bgVideo, creativeVideo, creativeSource, creative, corners, faces, tracking, keyframeData, keyframeCorners, segmentation, fitMode, display, cinematic, spill, timeOfDay, environment, ambient, autoTuneRequested, updateDisplay, updateCinematic, updateSpill, clearAutoTuneRequest, onFirstRender, isStaticPrintSurface, panelType]);
 
   // Re-render on dependency change (static sources)
   useEffect(() => {
@@ -632,6 +639,58 @@ function drawCreativeIntoQuad(
     );
     ctx.restore();
   }
+}
+
+function drawStaticMediaTexture(
+  ctx: CanvasRenderingContext2D,
+  corners: ScreenCorners,
+  panelType?: string,
+) {
+  const [tl, tr, br, bl] = corners;
+
+  const minX = Math.min(tl.x, tr.x, br.x, bl.x);
+  const maxX = Math.max(tl.x, tr.x, br.x, bl.x);
+  const minY = Math.min(tl.y, tr.y, br.y, bl.y);
+  const maxY = Math.max(tl.y, tr.y, br.y, bl.y);
+
+  const backlight = panelType === 'BackLights';
+  const baseTint = backlight ? 'rgba(248, 246, 236, 0.075)' : 'rgba(236, 228, 214, 0.11)';
+  const horizontalAlpha = backlight ? 0.03 : 0.05;
+  const verticalAlpha = backlight ? 0.02 : 0.035;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(tl.x, tl.y);
+  ctx.lineTo(tr.x, tr.y);
+  ctx.lineTo(br.x, br.y);
+  ctx.lineTo(bl.x, bl.y);
+  ctx.closePath();
+  ctx.clip();
+
+  // Slight material tint flattens LED-like contrast into printed-media feel.
+  ctx.fillStyle = baseTint;
+  ctx.fillRect(minX, minY, maxX - minX, maxY - minY);
+
+  ctx.globalCompositeOperation = 'soft-light';
+  for (let y = Math.floor(minY); y <= maxY; y += 3) {
+    ctx.strokeStyle = `rgba(255,255,255,${horizontalAlpha})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(minX, y);
+    ctx.lineTo(maxX, y);
+    ctx.stroke();
+  }
+
+  for (let x = Math.floor(minX); x <= maxX; x += 4) {
+    ctx.strokeStyle = `rgba(15,12,8,${verticalAlpha})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, minY);
+    ctx.lineTo(x, maxY);
+    ctx.stroke();
+  }
+
+  ctx.restore();
 }
 
 /**

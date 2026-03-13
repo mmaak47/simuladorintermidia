@@ -365,6 +365,23 @@ export const useCompositionStore = create<CompositionStore>((set, get) => ({
       dynamicColor: true,
     };
 
+    const isStaticPrintPanel = preset.type === 'FrontLights' || preset.type === 'BackLights';
+    const displayFromPreset = renderPresetToDisplay(preset.renderPreset);
+    const cinematicFromPreset = renderPresetToCinematic(preset.renderPreset);
+
+    if (isStaticPrintPanel) {
+      // Static panels are printed media (lona/tecido), not emissive LED.
+      displayFromPreset.screenNits = preset.type === 'BackLights' ? 420 : 300;
+      displayFromPreset.pixelGridIntensity = 0;
+      displayFromPreset.glassReflectivity = 0.03;
+      displayFromPreset.glassRoughness = 0.34;
+
+      cinematicFromPreset.bloomIntensity = Math.min(cinematicFromPreset.bloomIntensity, 0.14);
+      cinematicFromPreset.chromaticAberration = Math.min(cinematicFromPreset.chromaticAberration, 0.01);
+      cinematicFromPreset.highlightCompression = Math.max(cinematicFromPreset.highlightCompression, 0.28);
+      cinematicFromPreset.grainIntensity = Math.max(cinematicFromPreset.grainIntensity, 0.1);
+    }
+
     set({
       location,
       segmentation: null,
@@ -377,8 +394,8 @@ export const useCompositionStore = create<CompositionStore>((set, get) => ({
       keyframeCorners: [],
       activeKeyframeIndex: 0,
       fitMode: preset.fitMode,
-      display: renderPresetToDisplay(preset.renderPreset),
-      cinematic: renderPresetToCinematic(preset.renderPreset),
+      display: displayFromPreset,
+      cinematic: cinematicFromPreset,
       spill: spillFromPreset,
       ambient: {
         ...DEFAULT_AMBIENT_STATE,
