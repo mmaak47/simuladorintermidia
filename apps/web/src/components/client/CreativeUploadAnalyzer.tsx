@@ -12,6 +12,7 @@ import {
   type BackgroundMode,
 } from '@/services/logo_auto_layout';
 import { parseAspectString } from '@/services/aspect_ratio_utils';
+import { computeScreenAspect } from '@dooh/core';
 import type { PointPreset, CreativeSource } from '@dooh/core';
 
 /**
@@ -70,8 +71,27 @@ export function CreativeUploadAnalyzer({
     headline: pickRandomHeadline(),
   });
 
-  const targetW = selectedPoint.screenWidth > 0 ? selectedPoint.screenWidth : (parseAspectString(selectedPoint.screenAspect) >= 1 ? 1920 : 1080);
-  const targetH = selectedPoint.screenHeight > 0 ? selectedPoint.screenHeight : (parseAspectString(selectedPoint.screenAspect) >= 1 ? 1080 : 1920);
+  // Derive the creative's target dimensions from the most accurate source available:
+  // 1. Actual face corner geometry (most reliable — reflects what the camera sees)
+  // 2. screenWidth/screenHeight stored in DB (may be misconfigured)
+  // 3. screenAspect label string (last resort)
+  // This prevents portrait creatives being generated for wide-format panels.
+  const faces = selectedPoint.screenSelection?.faces;
+  const aspectFromFaces = faces && faces.length > 0 ? computeScreenAspect(faces[0]) : null;
+  const aspectFromDb =
+    selectedPoint.screenWidth > 0 && selectedPoint.screenHeight > 0
+      ? selectedPoint.screenWidth / selectedPoint.screenHeight
+      : null;
+  const screenAspectRatio = aspectFromFaces ?? aspectFromDb ?? parseAspectString(selectedPoint.screenAspect);
+
+  const BASE = 1080;
+  const MAX_LONG = 3840;
+  const targetW = screenAspectRatio >= 1
+    ? Math.min(Math.round(BASE * screenAspectRatio), MAX_LONG)
+    : BASE;
+  const targetH = screenAspectRatio < 1
+    ? Math.min(Math.round(BASE / screenAspectRatio), MAX_LONG)
+    : BASE;
 
   const regenerate = useCallback((opts: StyleOptions) => {
     if (analysis.creativeType !== 'logo') return;
