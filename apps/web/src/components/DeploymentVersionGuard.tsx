@@ -3,14 +3,15 @@
 import { useCallback, useEffect } from 'react';
 
 const CURRENT_VERSION = process.env.NEXT_PUBLIC_DEPLOYMENT_VERSION ?? 'dev';
-const VERSION_ENDPOINT = '/api/version';
+const VERSION_PROBE_URL = '/?__deployment_probe=1';
 const VERSION_POLL_MS = 60_000;
 const VERSION_RELOAD_KEY = 'dooh:deployment-version-reload';
 const ERROR_RECOVERY_KEY = 'dooh:deployment-error-recovery';
 
-type VersionResponse = {
-  version?: string;
-};
+function extractDeploymentVersion(html: string) {
+  const match = html.match(/<meta\s+name=["']dooh-deployment-version["']\s+content=["']([^"']+)["']/i);
+  return match?.[1]?.trim() ?? null;
+}
 
 function shouldForceRecovery(message: string) {
   const text = message.toLowerCase();
@@ -34,7 +35,7 @@ function reloadOnce(storageKey: string, targetVersion: string) {
 export function DeploymentVersionGuard() {
   const checkVersion = useCallback(async () => {
     try {
-      const response = await fetch(VERSION_ENDPOINT, {
+      const response = await fetch(VERSION_PROBE_URL, {
         cache: 'no-store',
         headers: {
           'cache-control': 'no-cache',
@@ -43,8 +44,8 @@ export function DeploymentVersionGuard() {
 
       if (!response.ok) return;
 
-      const data = (await response.json()) as VersionResponse;
-      const nextVersion = data.version?.trim();
+      const html = await response.text();
+      const nextVersion = extractDeploymentVersion(html);
       if (!nextVersion || nextVersion === CURRENT_VERSION) return;
 
       reloadOnce(VERSION_RELOAD_KEY, nextVersion);
