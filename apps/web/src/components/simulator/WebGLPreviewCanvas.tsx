@@ -106,6 +106,11 @@ export function WebGLPreviewCanvas({ onFirstRender, onWebGLError }: WebGLPreview
   const creativeTextureRef = useRef<THREE.Texture | null>(null);
   const rafRef = useRef<number>(0);
   const firstRenderFiredRef = useRef(false);
+  const renderHealthRef = useRef({
+    frameCount: 0,
+    darkStreak: 0,
+    fallbackTriggered: false,
+  });
 
   const {
     location,
@@ -132,6 +137,11 @@ export function WebGLPreviewCanvas({ onFirstRender, onWebGLError }: WebGLPreview
 
   useEffect(() => {
     firstRenderFiredRef.current = false;
+    renderHealthRef.current = {
+      frameCount: 0,
+      darkStreak: 0,
+      fallbackTriggered: false,
+    };
   }, [creative?.url, location?.url]);
 
   useEffect(() => {
@@ -419,13 +429,63 @@ export function WebGLPreviewCanvas({ onFirstRender, onWebGLError }: WebGLPreview
       renderer.render(compositor.scene, compositor.camera);
     }
 
+    // Safety net: if WebGL silently outputs black frames for too long,
+    // trigger legacy canvas fallback so the user never gets stuck with a black preview.
+    if (!renderHealthRef.current.fallbackTriggered && bgImage && !bgLoading && !bgError) {
+      const health = renderHealthRef.current;
+      health.frameCount += 1;
+
+      if (health.frameCount % 20 === 0) {
+        const gl = renderer.getContext();
+        const canvas = renderer.domElement;
+        const w = canvas.width;
+        const h = canvas.height;
+
+        if (w > 0 && h > 0) {
+          const samples: Array<[number, number]> = [
+            [0.5, 0.5],
+            [0.25, 0.5],
+            [0.75, 0.5],
+            [0.5, 0.25],
+            [0.5, 0.75],
+          ];
+
+          const px = new Uint8Array(4);
+          let maxLuma = 0;
+
+          for (const [nx, ny] of samples) {
+            const sx = Math.max(0, Math.min(w - 1, Math.round(nx * (w - 1))));
+            const syTop = Math.max(0, Math.min(h - 1, Math.round(ny * (h - 1))));
+            const sy = h - 1 - syTop;
+
+            gl.readPixels(sx, sy, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+
+            const luma = 0.2126 * px[0] + 0.7152 * px[1] + 0.0722 * px[2];
+            if (luma > maxLuma) maxLuma = luma;
+          }
+
+          if (maxLuma < 2) {
+            health.darkStreak += 1;
+          } else {
+            health.darkStreak = 0;
+          }
+
+          if (health.darkStreak >= 6) {
+            health.fallbackTriggered = true;
+            onWebGLError?.();
+            return;
+          }
+        }
+      }
+    }
+
     if (!firstRenderFiredRef.current && onFirstRender && creative) {
       firstRenderFiredRef.current = true;
       onFirstRender(renderer.domElement);
     }
 
     rafRef.current = requestAnimationFrame(renderLoop);
-  }, [location, bgVideo, keyframeData?.fps, keyframeCorners, tracking, corners, faces, creative, fitMode, timeOfDay, environment, cinematic.enabled, onFirstRender]);
+  }, [location, bgVideo, bgImage, bgLoading, bgError, keyframeData?.fps, keyframeCorners, tracking, corners, faces, creative, fitMode, timeOfDay, environment, cinematic.enabled, onFirstRender, onWebGLError]);
 
   useEffect(() => {
     if (!location || !rendererRef.current || !compositorRef.current) return;
