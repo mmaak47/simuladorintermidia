@@ -12,8 +12,6 @@ import { SimulationStatusCard } from '@/components/client/SimulationStatusCard';
 import { BeforeAfterSlider } from '@/components/client/BeforeAfterSlider';
 import { VideoSimulationCard } from '@/components/client/VideoSimulationCard';
 import { LeadCaptureModal } from '@/components/client/LeadCaptureModal';
-import { AttentionHeatmapPanel } from '@/components/client/AttentionHeatmapPanel';
-import { ABCreativePanel } from '@/components/client/ABCreativePanel';
 import { useClientStore } from '@/store/client-store';
 import { useCompositionStore } from '@/store/composition-store';
 import { useVideoRenderStore } from '@/store/video-render-store';
@@ -25,8 +23,6 @@ import { useDemoVideoInit } from '@/hooks/useDemoVideoInit';
 import { useInsertionCounter } from '@/hooks/useInsertionCounter';
 import { AppShell } from '@/components/layout/AppShell';
 import { submitLead } from '@/lib/lead-api';
-
-const VISION_BASE = process.env.NEXT_PUBLIC_VISION_API_URL ?? 'http://localhost:8000';
 
 export default function SimulatorPage() {
   // Initialize demo video assets at runtime
@@ -62,14 +58,6 @@ export default function SimulatorPage() {
   const [showVideoLeadFormModal, setShowVideoLeadFormModal] = useState(false);
   const [downloadClientName, setDownloadClientName] = useState<string>('');
   const [webglFailed, setWebglFailed] = useState(false);
-  const [attentionLoading, setAttentionLoading] = useState(false);
-  const [attentionOverlayEnabled, setAttentionOverlayEnabled] = useState(true);
-  const [attentionOpacity, setAttentionOpacity] = useState(0.45);
-  const [attentionHeatmapUrl, setAttentionHeatmapUrl] = useState<string | null>(null);
-  const [attentionScore, setAttentionScore] = useState<number | null>(null);
-  const [attentionZones, setAttentionZones] = useState<Array<{ x: number; y: number; width: number; height: number; score: number }>>([]);
-  const [abVariant, setAbVariant] = useState<typeof uploadedCreative | null>(null);
-  const [abCompareEnabled, setAbCompareEnabled] = useState(false);
   const [isNarrowViewport, setIsNarrowViewport] = useState(false);
 
   // The active point shown in preview: hovered takes priority over selected
@@ -282,50 +270,6 @@ export default function SimulatorPage() {
     }
   }, [activePoint, loadPointPreset, setCreative, setSimulationStatus]);
 
-  const handleGenerateAttentionHeatmap = useCallback(async () => {
-    if (!uploadedCreative || uploadedCreative.type !== 'image') return;
-
-    setAttentionLoading(true);
-    try {
-      const source = await fetch(uploadedCreative.url);
-      const blob = await source.blob();
-      const file = new File([blob], 'creative.png', { type: blob.type || 'image/png' });
-
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const res = await fetch('/api/vision/attention-heatmap', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!res.ok) return;
-      const data = await res.json() as {
-        heatmapUrl: string;
-        visibilityScore: number;
-        zones: Array<{ x: number; y: number; width: number; height: number; score: number }>;
-      };
-
-      setAttentionHeatmapUrl(`${VISION_BASE}${data.heatmapUrl}`);
-      setAttentionScore(data.visibilityScore);
-      setAttentionZones(data.zones || []);
-      setAttentionOverlayEnabled(true);
-    } finally {
-      setAttentionLoading(false);
-    }
-  }, [uploadedCreative]);
-
-  useEffect(() => {
-    setAttentionHeatmapUrl(null);
-    setAttentionScore(null);
-    setAttentionZones([]);
-  }, [uploadedCreative?.url, activePoint?.id]);
-
-  useEffect(() => {
-    setAbVariant(null);
-    setAbCompareEnabled(false);
-  }, [uploadedCreative?.url, activePoint?.id]);
-
   // Before/After slider visibility
   const showBeforeAfter = isVideoPoint
     && !isHoverPreview
@@ -360,17 +304,6 @@ export default function SimulatorPage() {
                 />
               )}
 
-              {attentionHeatmapUrl && attentionOverlayEnabled && (
-                <div className="absolute inset-0 z-20 pointer-events-none flex items-center justify-center p-4">
-                  <img
-                    src={attentionHeatmapUrl}
-                    alt="Attention heatmap"
-                    className="w-full h-full object-contain"
-                    style={{ opacity: attentionOpacity }}
-                  />
-                </div>
-              )}
-
               {/* ─── Image status overlay (image points only) ──── */}
               {showStatusCard && (
                 <div className="absolute inset-0 z-40 bg-surface-0/80 backdrop-blur-sm">
@@ -391,17 +324,6 @@ export default function SimulatorPage() {
                     afterImage={afterImage}
                     beforeLabel="Ponto original"
                     afterLabel="Com seu anúncio"
-                  />
-                </div>
-              )}
-
-              {abCompareEnabled && uploadedCreative?.type === 'image' && abVariant?.type === 'image' && (
-                <div className="absolute inset-0 z-[36]">
-                  <BeforeAfterSlider
-                    beforeImage={uploadedCreative.url}
-                    afterImage={abVariant.url}
-                    beforeLabel="Variante A"
-                    afterLabel="Variante B"
                   />
                 </div>
               )}
@@ -475,32 +397,6 @@ export default function SimulatorPage() {
               >
                 <EnvironmentPanel />
               </div>
-
-              {!isHoverPreview && uploadedCreative?.type === 'image' && (
-                <div className="hidden md:block absolute top-3 left-[15.5rem] z-30 w-56 pointer-events-auto">
-                  <AttentionHeatmapPanel
-                    loading={attentionLoading}
-                    visibilityScore={attentionScore}
-                    overlayEnabled={attentionOverlayEnabled}
-                    overlayOpacity={attentionOpacity}
-                    zones={attentionZones}
-                    onGenerate={handleGenerateAttentionHeatmap}
-                    onToggleOverlay={setAttentionOverlayEnabled}
-                    onOpacityChange={setAttentionOpacity}
-                  />
-                </div>
-              )}
-
-              {!isHoverPreview && uploadedCreative?.type === 'image' && (
-                <div className="hidden md:block absolute top-[15.6rem] left-[15.5rem] z-30 w-56 pointer-events-auto">
-                  <ABCreativePanel
-                    variant={abVariant}
-                    enabled={abCompareEnabled}
-                    onVariantChange={setAbVariant}
-                    onEnabledChange={setAbCompareEnabled}
-                  />
-                </div>
-              )}
 
               {/* ─── Impact counter card (floating) ──────── */}
               {!isHoverPreview && activePoint && (
