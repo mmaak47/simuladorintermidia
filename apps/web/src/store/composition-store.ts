@@ -370,16 +370,20 @@ export const useCompositionStore = create<CompositionStore>((set, get) => ({
     const cinematicFromPreset = renderPresetToCinematic(preset.renderPreset);
 
     if (isStaticPrintPanel) {
-      // Static panels are printed media (lona/tecido), not emissive LED.
-      displayFromPreset.screenNits = preset.type === 'BackLights' ? 420 : 300;
-      displayFromPreset.pixelGridIntensity = 0;
-      displayFromPreset.glassReflectivity = 0.03;
-      displayFromPreset.glassRoughness = 0.34;
+      const textureIntensity = Math.max(0, Math.min(1, preset.renderPreset.staticTextureIntensity ?? 0.45));
+      const lightTransmission = Math.max(0, Math.min(1, preset.renderPreset.staticLightTransmission ?? (preset.type === 'BackLights' ? 0.65 : 0.4)));
 
-      cinematicFromPreset.bloomIntensity = Math.min(cinematicFromPreset.bloomIntensity, 0.14);
+      // Static panels are printed media (lona/tecido), not emissive LED.
+      const baseNits = preset.type === 'BackLights' ? 420 : 300;
+      displayFromPreset.screenNits = Math.round(baseNits * (0.75 + lightTransmission * 0.5));
+      displayFromPreset.pixelGridIntensity = 0;
+      displayFromPreset.glassReflectivity = 0.02 + (1 - textureIntensity) * 0.03;
+      displayFromPreset.glassRoughness = 0.28 + textureIntensity * 0.18;
+
+      cinematicFromPreset.bloomIntensity = Math.min(cinematicFromPreset.bloomIntensity, 0.08 + lightTransmission * 0.12);
       cinematicFromPreset.chromaticAberration = Math.min(cinematicFromPreset.chromaticAberration, 0.01);
-      cinematicFromPreset.highlightCompression = Math.max(cinematicFromPreset.highlightCompression, 0.28);
-      cinematicFromPreset.grainIntensity = Math.max(cinematicFromPreset.grainIntensity, 0.1);
+      cinematicFromPreset.highlightCompression = Math.max(cinematicFromPreset.highlightCompression, 0.25 + textureIntensity * 0.2);
+      cinematicFromPreset.grainIntensity = Math.max(cinematicFromPreset.grainIntensity, 0.06 + textureIntensity * 0.12);
     }
 
     set({

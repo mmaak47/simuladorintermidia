@@ -349,6 +349,8 @@ export default function SimulatorPage() {
                 <PreviewCanvas
                   readOnly
                   panelType={activePoint?.type}
+                  staticTextureIntensity={activePoint?.renderPreset.staticTextureIntensity}
+                  staticLightTransmission={activePoint?.renderPreset.staticLightTransmission}
                   onFirstRender={isVideoPoint ? handleFirstRender : undefined}
                 />
               ) : (

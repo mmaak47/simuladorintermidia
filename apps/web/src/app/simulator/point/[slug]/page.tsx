@@ -64,7 +64,12 @@ export default function PointSimulationPage() {
       <main className="flex-1 relative min-h-0 bg-surface-0">
         {/* Creative uploaded + screen configured → show full simulation */}
         {creative && hasScreenSelection && location ? (
-          <PreviewCanvas readOnly />
+          <PreviewCanvas
+            readOnly
+            panelType={point.type}
+            staticTextureIntensity={point.renderPreset.staticTextureIntensity}
+            staticLightTransmission={point.renderPreset.staticLightTransmission}
+          />
         ) : (
           /* Creative upload prompt — NO location/media upload */
           <div className="flex items-center justify-center h-full">

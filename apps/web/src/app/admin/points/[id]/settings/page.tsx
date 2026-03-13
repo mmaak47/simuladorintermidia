@@ -6,6 +6,7 @@ import { AppShell } from '@/components/layout/AppShell';
 import { usePointStore } from '@/store/point-store';
 import { formatHour } from '@/lib/time-of-day';
 import type { RenderPreset, FitMode } from '@dooh/core';
+import { DEFAULT_RENDER_PRESET } from '@dooh/core';
 import type { SpillSettings } from '@dooh/core';
 import { DEFAULT_SPILL_SETTINGS } from '@dooh/core';
 import type { TimeOfDaySettings } from '@/lib/time-of-day';
@@ -45,7 +46,9 @@ export default function PointSettingsPage() {
   const togglePublish = usePointStore((s) => s.togglePublish);
 
   const [preset, setPreset] = useState<RenderPreset>(
-    point?.renderPreset ?? { screenNits: 700, bloom: 0.12, glassReflection: 0.08, grain: 0.06, cinematicMode: true },
+    point?.renderPreset
+      ? { ...DEFAULT_RENDER_PRESET, ...point.renderPreset }
+      : { ...DEFAULT_RENDER_PRESET },
   );
   const [fitMode, setFitMode] = useState<FitMode>(point?.fitMode ?? 'cover');
   const [spillSettings, setSpillSettings] = useState<SpillSettings>({ ...DEFAULT_SPILL_SETTINGS });
@@ -65,6 +68,7 @@ export default function PointSettingsPage() {
   const [metaAudienceClass, setMetaAudienceClass] = useState(point?.audienceClassification ?? '');
 
   const [saved, setSaved] = useState(false);
+  const isStaticPrintPanel = point?.type === 'FrontLights' || point?.type === 'BackLights';
 
   const handleSave = useCallback(() => {
     if (!point) return;
@@ -203,6 +207,37 @@ export default function PointSettingsPage() {
             <Slider label="Bloom" value={preset.bloom} min={0} max={1} step={0.01} onChange={(v) => setPreset((p) => ({ ...p, bloom: v }))} />
             <Slider label="Reflexo do vidro" value={preset.glassReflection} min={0} max={1} step={0.01} onChange={(v) => setPreset((p) => ({ ...p, glassReflection: v }))} />
             <Slider label="Grão" value={preset.grain} min={0} max={1} step={0.01} onChange={(v) => setPreset((p) => ({ ...p, grain: v }))} />
+
+            {isStaticPrintPanel && (
+              <>
+                <div className="pt-2 border-t border-white/10">
+                  <h4 className="text-label font-heading font-semibold text-white/60 uppercase tracking-wider mb-3">
+                    Midia Estatica ({point.type === 'BackLights' ? 'BackLight' : 'FrontLight'})
+                  </h4>
+                  <p className="text-[11px] text-neutral-500 font-body mb-3">
+                    Ajusta o aspecto de lona/tecido para paineis sem LED emissivo.
+                  </p>
+                  <div className="space-y-5">
+                    <Slider
+                      label="Textura da lona"
+                      value={preset.staticTextureIntensity ?? 0.45}
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      onChange={(v) => setPreset((p) => ({ ...p, staticTextureIntensity: v }))}
+                    />
+                    <Slider
+                      label="Transmissao de luz"
+                      value={preset.staticLightTransmission ?? (point.type === 'BackLights' ? 0.65 : 0.4)}
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      onChange={(v) => setPreset((p) => ({ ...p, staticLightTransmission: v }))}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
 
             <div className="flex items-center justify-between">
               <label className="text-label text-neutral-400 font-body">Modo cinematográfico</label>

@@ -239,6 +239,10 @@ export interface RenderPreset {
   lightSpillRadius?: number;
   /** Bezel reflection strength 0..1 (defaults to 0.15) */
   bezelReflection?: number;
+  /** Printed-media weave texture intensity 0..1 (Front/BackLight only) */
+  staticTextureIntensity?: number;
+  /** Back/front illumination transmission 0..1 (Front/BackLight only) */
+  staticLightTransmission?: number;
 }
 
 export const DEFAULT_RENDER_PRESET: RenderPreset = {
@@ -247,6 +251,8 @@ export const DEFAULT_RENDER_PRESET: RenderPreset = {
   glassReflection: 0.08,
   grain: 0.06,
   cinematicMode: true,
+  staticTextureIntensity: 0.45,
+  staticLightTransmission: 0.5,
 };
 
 export interface PointPreset {

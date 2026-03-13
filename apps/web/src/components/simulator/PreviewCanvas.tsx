@@ -60,10 +60,19 @@ interface PreviewCanvasProps {
   readOnly?: boolean;
   editorMode?: 'none' | 'basic' | 'perspective';
   panelType?: string;
+  staticTextureIntensity?: number;
+  staticLightTransmission?: number;
   onFirstRender?: (canvas: HTMLCanvasElement) => void;
 }
 
-export function PreviewCanvas({ readOnly = false, editorMode, panelType, onFirstRender }: PreviewCanvasProps) {
+export function PreviewCanvas({
+  readOnly = false,
+  editorMode,
+  panelType,
+  staticTextureIntensity = 0.45,
+  staticLightTransmission = 0.5,
+  onFirstRender,
+}: PreviewCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const firstRenderFiredRef = useRef(false);
@@ -268,7 +277,11 @@ export function PreviewCanvas({ readOnly = false, editorMode, panelType, onFirst
 
         // FrontLight/BackLight surfaces are printed media (lona/tecido), not LED.
         if (isStaticPrintSurface) {
-          drawStaticMediaTexture(ctx, faceCorners, panelType);
+          drawStaticMediaTexture(ctx, faceCorners, {
+            panelType,
+            textureIntensity: staticTextureIntensity,
+            lightTransmission: staticLightTransmission,
+          });
         }
 
         // 4. Light spill — screen light bleeding onto surrounding walls
@@ -342,7 +355,7 @@ export function PreviewCanvas({ readOnly = false, editorMode, panelType, onFirst
         ctx.restore();
       }
     }
-  }, [location, bgSource, bgVideo, creativeVideo, creativeSource, creative, corners, faces, tracking, keyframeData, keyframeCorners, segmentation, fitMode, display, cinematic, spill, timeOfDay, environment, ambient, autoTuneRequested, updateDisplay, updateCinematic, updateSpill, clearAutoTuneRequest, onFirstRender, isStaticPrintSurface, panelType]);
+  }, [location, bgSource, bgVideo, creativeVideo, creativeSource, creative, corners, faces, tracking, keyframeData, keyframeCorners, segmentation, fitMode, display, cinematic, spill, timeOfDay, environment, ambient, autoTuneRequested, updateDisplay, updateCinematic, updateSpill, clearAutoTuneRequest, onFirstRender, isStaticPrintSurface, panelType, staticTextureIntensity, staticLightTransmission]);
 
   // Re-render on dependency change (static sources)
   useEffect(() => {
@@ -644,8 +657,15 @@ function drawCreativeIntoQuad(
 function drawStaticMediaTexture(
   ctx: CanvasRenderingContext2D,
   corners: ScreenCorners,
-  panelType?: string,
+  options?: {
+    panelType?: string;
+    textureIntensity?: number;
+    lightTransmission?: number;
+  },
 ) {
+  const panelType = options?.panelType;
+  const textureIntensity = Math.max(0, Math.min(1, options?.textureIntensity ?? 0.45));
+  const lightTransmission = Math.max(0, Math.min(1, options?.lightTransmission ?? 0.5));
   const [tl, tr, br, bl] = corners;
 
   const minX = Math.min(tl.x, tr.x, br.x, bl.x);
@@ -654,9 +674,12 @@ function drawStaticMediaTexture(
   const maxY = Math.max(tl.y, tr.y, br.y, bl.y);
 
   const backlight = panelType === 'BackLights';
-  const baseTint = backlight ? 'rgba(248, 246, 236, 0.075)' : 'rgba(236, 228, 214, 0.11)';
-  const horizontalAlpha = backlight ? 0.03 : 0.05;
-  const verticalAlpha = backlight ? 0.02 : 0.035;
+  const baseTintAlpha = (backlight ? 0.06 : 0.09) + textureIntensity * 0.06 - lightTransmission * 0.03;
+  const baseTint = backlight
+    ? `rgba(248, 246, 236, ${Math.max(0, baseTintAlpha).toFixed(3)})`
+    : `rgba(236, 228, 214, ${Math.max(0, baseTintAlpha).toFixed(3)})`;
+  const horizontalAlpha = (backlight ? 0.02 : 0.035) + textureIntensity * 0.03;
+  const verticalAlpha = (backlight ? 0.015 : 0.025) + textureIntensity * 0.02;
 
   ctx.save();
   ctx.beginPath();
@@ -672,7 +695,10 @@ function drawStaticMediaTexture(
   ctx.fillRect(minX, minY, maxX - minX, maxY - minY);
 
   ctx.globalCompositeOperation = 'soft-light';
-  for (let y = Math.floor(minY); y <= maxY; y += 3) {
+  const hStep = Math.max(2, Math.round(4 - textureIntensity * 2));
+  const vStep = Math.max(3, Math.round(5 - textureIntensity * 2));
+
+  for (let y = Math.floor(minY); y <= maxY; y += hStep) {
     ctx.strokeStyle = `rgba(255,255,255,${horizontalAlpha})`;
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -681,7 +707,7 @@ function drawStaticMediaTexture(
     ctx.stroke();
   }
 
-  for (let x = Math.floor(minX); x <= maxX; x += 4) {
+  for (let x = Math.floor(minX); x <= maxX; x += vStep) {
     ctx.strokeStyle = `rgba(15,12,8,${verticalAlpha})`;
     ctx.lineWidth = 1;
     ctx.beginPath();
