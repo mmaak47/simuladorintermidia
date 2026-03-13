@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { AppShell } from '@/components/layout/AppShell';
 import { usePointStore } from '@/store/point-store';
 import { formatHour } from '@/lib/time-of-day';
-import type { RenderPreset, FitMode } from '@dooh/core';
+import type { RenderPreset, FitMode, PointType } from '@dooh/core';
 import { DEFAULT_RENDER_PRESET } from '@dooh/core';
 import type { SpillSettings } from '@dooh/core';
 import { DEFAULT_SPILL_SETTINGS } from '@dooh/core';
@@ -66,9 +66,10 @@ export default function PointSettingsPage() {
   );
   const [metaAudience, setMetaAudience] = useState(point?.targetAudience ?? '');
   const [metaAudienceClass, setMetaAudienceClass] = useState(point?.audienceClassification ?? '');
+  const [metaType, setMetaType] = useState<PointType>(point?.type ?? 'Indoors');
 
   const [saved, setSaved] = useState(false);
-  const isStaticPrintPanel = point?.type === 'FrontLights' || point?.type === 'BackLights';
+  const isStaticPrintPanel = metaType === 'FrontLights' || metaType === 'BackLights';
 
   const handleSave = useCallback(() => {
     if (!point) return;
@@ -77,6 +78,7 @@ export default function PointSettingsPage() {
     // Save metadata
     updatePoint(id, {
       name: metaName.trim() || point.name,
+      type: metaType,
       city: metaCity.trim(),
       address: metaAddress.trim(),
       description: metaDescription.trim(),
@@ -89,7 +91,7 @@ export default function PointSettingsPage() {
     setTimeout(() => setSaved(false), 2000);
   }, [id, point, preset, fitMode, updateRenderPreset, updateFitMode, updatePoint,
       metaName, metaCity, metaAddress, metaDescription,
-      metaInsertionType, metaMinInsertions, metaAudience, metaAudienceClass]);
+      metaInsertionType, metaMinInsertions, metaAudience, metaAudienceClass, metaType]);
 
   if (!point) {
     return (
@@ -147,6 +149,20 @@ export default function PointSettingsPage() {
               <div className="space-y-1.5">
                 <label className="text-label text-neutral-400 font-body">Nome</label>
                 <input type="text" value={metaName} onChange={(e) => setMetaName(e.target.value)} placeholder="Nome do ponto" className="w-full rounded-lg bg-surface-2 border border-white/10 px-4 py-2.5 text-sm text-white font-body placeholder-neutral-600 focus:border-accent focus:outline-none transition-colors" />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-label text-neutral-400 font-body">Tipo de ponto</label>
+                <select
+                  value={metaType}
+                  onChange={(e) => setMetaType(e.target.value as PointType)}
+                  className="w-full rounded-lg bg-surface-2 border border-white/10 px-4 py-2.5 text-sm text-white font-body focus:border-accent focus:outline-none transition-colors"
+                >
+                  <option value="Paineis de Led">Paineis de Led</option>
+                  <option value="FrontLights">FrontLights (lona iluminada frente)</option>
+                  <option value="BackLights">BackLights (lona iluminada verso)</option>
+                  <option value="Indoors">Indoors</option>
+                  <option value="Elevadores">Elevadores</option>
+                </select>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
