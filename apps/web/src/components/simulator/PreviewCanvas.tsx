@@ -273,6 +273,7 @@ export function PreviewCanvas({
       for (const faceCorners of activeFaces) {
         drawCreativeIntoQuad(ctx, creativeSource, cw, ch, faceCorners, fitMode, display, {
           realtime: isRealtimeVideo,
+          highQuality: isStaticPrintSurface,
         });
 
         // FrontLight/BackLight surfaces are printed media (lona/tecido), not LED.
@@ -535,6 +536,7 @@ function drawCreativeIntoQuad(
   display: DisplaySettings,
   options?: {
     realtime?: boolean;
+    highQuality?: boolean;
   },
 ) {
   const [tl, tr, br, bl] = corners;
@@ -545,11 +547,14 @@ function drawCreativeIntoQuad(
   const aspect = computeScreenAspect(corners);
   const fit = computeUvFit(cw, ch, aspect, fitMode);
 
-  // Subdivision grid for perspective approximation
+  // Subdivision grid for perspective approximation.
+  // highQuality uses more cells for printed-media panels (no real-time budget).
   // Lower subdivision in realtime video mode for significantly better FPS.
-  const DIVS = options?.realtime ? 5 : 8;
+  const DIVS = options?.realtime ? 5 : (options?.highQuality ? 20 : 8);
 
   ctx.save();
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = options?.highQuality ? 'high' : (options?.realtime ? 'low' : 'medium');
 
   // Clip to the quad shape
   ctx.beginPath();
@@ -654,6 +659,122 @@ function drawCreativeIntoQuad(
   }
 }
 
+// ─── Static-media (FrontLight / BackLight) rendering helpers ────────────────
+
+/** Per-session UV offsets — shift where the texture tile seam lands in the quad */
+const SESSION_UV_OFFSET_U = Math.random();
+const SESSION_UV_OFFSET_V = Math.random();
+
+/** Module-level reusable offscreen canvas for texture overlay compositing */
+let _overlayCanvas: HTMLCanvasElement | null = null;
+
+/** Module-level fabric texture cache (one 2048px canvas per discrete variant) */
+const _fabricCache: Record<string, HTMLCanvasElement> = {};
+
+/**
+ * Fast mulberry32 PRNG — deterministic given the same seed.
+ * Returns a function that produces a float in [0, 1).
+ */
+function mulberry32(seed: number): () => number {
+  let s = seed >>> 0;
+  return () => {
+    s = (s + 0x6d2b79f5) >>> 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 0x100000000;
+  };
+}
+
+/**
+ * Generate (or retrieve from cache) a 2048×2048 procedural fabric / lona texture.
+ *
+ * The texture is built entirely with deterministic random ops so it:
+ * - never repeats in an obvious grid
+ * - contains sub-pixel jitter on thread positions (prevents brick-grid artifacts)
+ * - contains micro-wrinkle strokes (organic surface displacement)
+ * - has a Gaussian-ish noise pass for grain
+ */
+function getFabricTexture(isBacklight: boolean, textureIntensity: number): HTMLCanvasElement {
+  const iKey = Math.round(textureIntensity * 20); // 20 discrete quality steps
+  const key = `${isBacklight ? 'b' : 'f'}_${iKey}`;
+  if (_fabricCache[key]) return _fabricCache[key];
+
+  const SIZE = 2048;
+  const canvas = document.createElement('canvas');
+  canvas.width = SIZE;
+  canvas.height = SIZE;
+  const fCtx = canvas.getContext('2d', { willReadFrequently: true })!;
+
+  // Deterministic seed unique to variant — produces same texture across renders
+  const rng = mulberry32(0xf1b3c2a0 ^ (isBacklight ? 0x1327 : 0x4891) ^ (iKey * 7919));
+
+  // Base warm-neutral fill
+  fCtx.fillStyle = isBacklight ? 'rgb(250,248,240)' : 'rgb(242,234,218)';
+  fCtx.fillRect(0, 0, SIZE, SIZE);
+
+  fCtx.imageSmoothingEnabled = true;
+  fCtx.imageSmoothingQuality = 'high';
+
+  // ── Horizontal weft threads ───────────────────────────────────────────────
+  // Sub-pixel positional jitter breaks the regular grid pattern
+  const hStep = Math.round(3 + (1 - textureIntensity) * 2.5); // 3–5 px spacing
+  fCtx.globalCompositeOperation = 'soft-light';
+  for (let y = 0; y < SIZE; y += hStep) {
+    const yOff = (rng() - 0.5) * 1.4;
+    const alpha = 0.022 + rng() * 0.018 + textureIntensity * 0.012;
+    fCtx.strokeStyle = `rgba(255,255,255,${alpha.toFixed(3)})`;
+    fCtx.lineWidth = 0.7 + rng() * 0.5;
+    fCtx.beginPath();
+    fCtx.moveTo(0, y + yOff);
+    fCtx.lineTo(SIZE, y + yOff);
+    fCtx.stroke();
+  }
+
+  // ── Vertical warp threads ─────────────────────────────────────────────────
+  const vStep = Math.round(4.5 + (1 - textureIntensity) * 3); // 4–7 px spacing
+  for (let x = 0; x < SIZE; x += vStep) {
+    const xOff = (rng() - 0.5) * 1.4;
+    const alpha = 0.016 + rng() * 0.012 + textureIntensity * 0.008;
+    fCtx.strokeStyle = `rgba(18,13,6,${alpha.toFixed(3)})`;
+    fCtx.lineWidth = 0.6 + rng() * 0.4;
+    fCtx.beginPath();
+    fCtx.moveTo(x + xOff, 0);
+    fCtx.lineTo(x + xOff, SIZE);
+    fCtx.stroke();
+  }
+
+  // ── Micro-wrinkles: subtle diagonal strokes ───────────────────────────────
+  for (let i = 0; i < 26; i++) {
+    const x0 = rng() * SIZE;
+    const y0 = rng() * SIZE;
+    const len = 60 + rng() * 200;
+    const angle = (rng() - 0.5) * Math.PI * 0.22; // mostly horizontal
+    const alpha = 0.010 + rng() * 0.014;
+    fCtx.strokeStyle = `rgba(200,188,168,${alpha.toFixed(3)})`;
+    fCtx.lineWidth = 1.2 + rng() * 2.2;
+    fCtx.beginPath();
+    fCtx.moveTo(x0, y0);
+    fCtx.lineTo(x0 + Math.cos(angle) * len, y0 + Math.sin(angle) * len);
+    fCtx.stroke();
+  }
+
+  // ── Gaussian-ish noise pass via ImageData ─────────────────────────────────
+  fCtx.globalCompositeOperation = 'source-over';
+  const noiseData = fCtx.getImageData(0, 0, SIZE, SIZE);
+  const nd = noiseData.data;
+  const noiseStr = 5 + textureIntensity * 4; // 5–9 levels
+  for (let i = 0; i < nd.length; i += 4) {
+    const n = (rng() - 0.5) * noiseStr * 2;
+    nd[i]     = Math.max(0, Math.min(255, nd[i]     + n));
+    nd[i + 1] = Math.max(0, Math.min(255, nd[i + 1] + n * 0.95));
+    nd[i + 2] = Math.max(0, Math.min(255, nd[i + 2] + n * 0.85));
+  }
+  fCtx.putImageData(noiseData, 0, 0);
+
+  _fabricCache[key] = canvas;
+  return canvas;
+}
+
 function drawStaticMediaTexture(
   ctx: CanvasRenderingContext2D,
   corners: ScreenCorners,
@@ -666,57 +787,169 @@ function drawStaticMediaTexture(
   const panelType = options?.panelType;
   const textureIntensity = Math.max(0, Math.min(1, options?.textureIntensity ?? 0.45));
   const lightTransmission = Math.max(0, Math.min(1, options?.lightTransmission ?? 0.5));
+  const isBacklight = panelType === 'BackLights';
   const [tl, tr, br, bl] = corners;
 
-  const minX = Math.min(tl.x, tr.x, br.x, bl.x);
-  const maxX = Math.max(tl.x, tr.x, br.x, bl.x);
-  const minY = Math.min(tl.y, tr.y, br.y, bl.y);
-  const maxY = Math.max(tl.y, tr.y, br.y, bl.y);
+  const minX = Math.floor(Math.min(tl.x, tr.x, br.x, bl.x));
+  const maxX = Math.ceil(Math.max(tl.x, tr.x, br.x, bl.x));
+  const minY = Math.floor(Math.min(tl.y, tr.y, br.y, bl.y));
+  const maxY = Math.ceil(Math.max(tl.y, tr.y, br.y, bl.y));
+  const bboxW = maxX - minX;
+  const bboxH = maxY - minY;
+  if (bboxW <= 0 || bboxH <= 0) return;
 
-  const backlight = panelType === 'BackLights';
-  const baseTintAlpha = (backlight ? 0.06 : 0.09) + textureIntensity * 0.06 - lightTransmission * 0.03;
-  const baseTint = backlight
-    ? `rgba(248, 246, 236, ${Math.max(0, baseTintAlpha).toFixed(3)})`
-    : `rgba(236, 228, 214, ${Math.max(0, baseTintAlpha).toFixed(3)})`;
-  const horizontalAlpha = (backlight ? 0.02 : 0.035) + textureIntensity * 0.03;
-  const verticalAlpha = (backlight ? 0.015 : 0.025) + textureIntensity * 0.02;
+  // ─── 1. Build (or get cached) 2048px procedural fabric texture ────────────
+  const fabricTex = getFabricTexture(isBacklight, textureIntensity);
+  const texW = fabricTex.width;  // 2048
+  const texH = fabricTex.height; // 2048
 
+  // ─── 2. Draw the fabric texture into an offscreen bbox canvas ─────────────
+  // Using an offscreen canvas lets us apply a single blur on composite-step,
+  // avoiding expensive per-cell filter calls.
+  if (!_overlayCanvas) _overlayCanvas = document.createElement('canvas');
+  if (_overlayCanvas.width !== bboxW)  _overlayCanvas.width  = bboxW;
+  if (_overlayCanvas.height !== bboxH) _overlayCanvas.height = bboxH;
+  const oCtx = _overlayCanvas.getContext('2d', { willReadFrequently: false });
+  if (!oCtx) return;
+  oCtx.clearRect(0, 0, bboxW, bboxH);
+
+  // Translate corners into local bbox-space
+  const ltl = { x: tl.x - minX, y: tl.y - minY };
+  const ltr = { x: tr.x - minX, y: tr.y - minY };
+  const lbr = { x: br.x - minX, y: br.y - minY };
+  const lbl = { x: bl.x - minX, y: bl.y - minY };
+
+  oCtx.save();
+  oCtx.beginPath();
+  oCtx.moveTo(ltl.x, ltl.y);
+  oCtx.lineTo(ltr.x, ltr.y);
+  oCtx.lineTo(lbr.x, lbr.y);
+  oCtx.lineTo(lbl.x, lbl.y);
+  oCtx.closePath();
+  oCtx.clip();
+
+  oCtx.imageSmoothingEnabled = true;
+  oCtx.imageSmoothingQuality = 'high';
+
+  // UV mapping: UV_SCALE controls how much of the texture maps across the quad.
+  // 0.55 means 55% of the texture is visible — thread density stays fine-grained.
+  // The random session offset shifts the "tile seam" to a non-edge position.
+  const UV_SCALE = 0.55;
+  const uOff = SESSION_UV_OFFSET_U * texW * (1 - UV_SCALE);
+  const vOff = SESSION_UV_OFFSET_V * texH * (1 - UV_SCALE);
+  const cellTexW = (texW * UV_SCALE);
+  const cellTexH = (texH * UV_SCALE);
+
+  // 18×18 subdivision — 324 cells — high fidelity perspective warp of texture
+  const TDIVS = 18;
+  for (let row = 0; row < TDIVS; row++) {
+    for (let col = 0; col < TDIVS; col++) {
+      const u0 = col / TDIVS;
+      const u1 = (col + 1) / TDIVS;
+      const v0 = row / TDIVS;
+      const v1 = (row + 1) / TDIVS;
+
+      const p00 = bilerp(ltl, ltr, lbr, lbl, u0, v0);
+      const p10 = bilerp(ltl, ltr, lbr, lbl, u1, v0);
+      const p01 = bilerp(ltl, ltr, lbr, lbl, u0, v1);
+      const p11 = bilerp(ltl, ltr, lbr, lbl, u1, v1);
+
+      drawAffineCell(
+        oCtx, fabricTex,
+        uOff + u0 * cellTexW,
+        vOff + v0 * cellTexH,
+        cellTexW / TDIVS,
+        cellTexH / TDIVS,
+        p00, p10, p01, p11,
+      );
+    }
+  }
+
+  // ─── 3. Lighting variation overlay (projector / backlight fall-off) ────────
+  oCtx.beginPath();
+  oCtx.moveTo(ltl.x, ltl.y);
+  oCtx.lineTo(ltr.x, ltr.y);
+  oCtx.lineTo(lbr.x, lbr.y);
+  oCtx.lineTo(lbl.x, lbl.y);
+  oCtx.closePath();
+  // Re-clip (context was restored above)
+  // We're still inside the save block — reuse the clip
+  if (isBacklight) {
+    // Backlight: radial bloom from centre (light diffuses inward from edge frame)
+    const cx = (ltl.x + ltr.x + lbr.x + lbl.x) / 4;
+    const cy = (ltl.y + ltr.y + lbr.y + lbl.y) / 4;
+    const rad = Math.hypot(bboxW, bboxH) * 0.48;
+    const rg = oCtx.createRadialGradient(cx, cy, 0, cx, cy, rad);
+    rg.addColorStop(0, `rgba(255,253,238,${(0.10 + lightTransmission * 0.09).toFixed(3)})`);
+    rg.addColorStop(0.55, `rgba(255,250,228,0.03)`);
+    rg.addColorStop(1, 'rgba(0,0,0,0)');
+    oCtx.globalCompositeOperation = 'soft-light';
+    oCtx.fillStyle = rg;
+    oCtx.fillRect(0, 0, bboxW, bboxH);
+  } else {
+    // Frontlight: linear fall-off from top (projectors illuminate from above)
+    const topY = (ltl.y + ltr.y) / 2;
+    const botY = (lbl.y + lbr.y) / 2;
+    const midX = (ltl.x + ltr.x + lbr.x + lbl.x) / 4;
+    const lg = oCtx.createLinearGradient(midX, topY, midX, botY);
+    lg.addColorStop(0, `rgba(255,252,232,${(0.09 + lightTransmission * 0.07).toFixed(3)})`);
+    lg.addColorStop(0.40, 'rgba(255,249,224,0.03)');
+    lg.addColorStop(1,  `rgba(14,9,0,${(0.05 + (1 - lightTransmission) * 0.04).toFixed(3)})`);
+    oCtx.globalCompositeOperation = 'soft-light';
+    oCtx.fillStyle = lg;
+    oCtx.fillRect(0, 0, bboxW, bboxH);
+  }
+  oCtx.restore();
+
+  // ─── 4. Composite overlay onto main canvas ────────────────────────────────
+  // A 0.35 px blur on drawImage softens any remaining cell-boundary seams
+  // without blurring the banner artwork itself.
+  const overlayAlpha = 0.11 + textureIntensity * 0.07; // 11–18 %
   ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(tl.x, tl.y);
-  ctx.lineTo(tr.x, tr.y);
-  ctx.lineTo(br.x, br.y);
-  ctx.lineTo(bl.x, bl.y);
-  ctx.closePath();
-  ctx.clip();
-
-  // Slight material tint flattens LED-like contrast into printed-media feel.
-  ctx.fillStyle = baseTint;
-  ctx.fillRect(minX, minY, maxX - minX, maxY - minY);
-
   ctx.globalCompositeOperation = 'soft-light';
-  const hStep = Math.max(2, Math.round(4 - textureIntensity * 2));
-  const vStep = Math.max(3, Math.round(5 - textureIntensity * 2));
-
-  for (let y = Math.floor(minY); y <= maxY; y += hStep) {
-    ctx.strokeStyle = `rgba(255,255,255,${horizontalAlpha})`;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(minX, y);
-    ctx.lineTo(maxX, y);
-    ctx.stroke();
-  }
-
-  for (let x = Math.floor(minX); x <= maxX; x += vStep) {
-    ctx.strokeStyle = `rgba(15,12,8,${verticalAlpha})`;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(x, minY);
-    ctx.lineTo(x, maxY);
-    ctx.stroke();
-  }
-
+  ctx.globalAlpha = overlayAlpha;
+  ctx.filter = 'blur(0.35px)';
+  ctx.drawImage(_overlayCanvas, minX, minY);
+  ctx.filter = 'none';
   ctx.restore();
+
+  // ─── 5. Warm material tint via multiply — desaturates LED-like colours ─────
+  const tintAlpha = Math.max(0,
+    (isBacklight ? 0.04 : 0.06) + textureIntensity * 0.035 - lightTransmission * 0.02,
+  );
+  if (tintAlpha > 0.004) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(tl.x, tl.y);
+    ctx.lineTo(tr.x, tr.y);
+    ctx.lineTo(br.x, br.y);
+    ctx.lineTo(bl.x, bl.y);
+    ctx.closePath();
+    ctx.clip();
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.globalAlpha = tintAlpha;
+    ctx.fillStyle = isBacklight ? 'rgb(255,250,228)' : 'rgb(248,237,215)';
+    ctx.fillRect(minX, minY, bboxW, bboxH);
+    ctx.restore();
+  }
+
+  // ─── 6. Film grain via ImageData (last step — applied over the full banner) ─
+  // Gaussian-ish noise at 1.5–3.5 % intensity breaks repeating pattern tiling
+  // and adds the organic imperfection of real printed vinyl / lona media.
+  // Reading back the exact bounding box avoids re-encoding the full canvas.
+  const grainStr = 4 + textureIntensity * 5; // 4–9 levels out of 255
+  try {
+    const imageData = ctx.getImageData(minX, minY, bboxW, bboxH);
+    const d = imageData.data;
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i + 3] < 10) continue; // skip transparent
+      const n = (Math.random() - 0.5) * grainStr * 2;
+      d[i]     = Math.max(0, Math.min(255, d[i]     + n));
+      d[i + 1] = Math.max(0, Math.min(255, d[i + 1] + n));
+      d[i + 2] = Math.max(0, Math.min(255, d[i + 2] + n));
+    }
+    ctx.putImageData(imageData, minX, minY);
+  } catch { /* silently ignore cross-origin canvas restrictions */ }
 }
 
 /**
